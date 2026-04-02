@@ -1,2 +1,30 @@
 node_modules/
-.gitignore
+.next/
+out/
+dist/
+build/
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+
+# Local env (do not commit secrets)
+.env
+.env.*
+!.env.example
+
+# Prisma local/dev db
+prisma/dev.db
+
+# Uploaded media (local storage default)
+public/uploads/
+uploads/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+.cursor/
+*.tsbuildinfo

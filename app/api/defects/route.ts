@@ -15,7 +15,15 @@ export async function POST(req: Request) {
 	await requireAdmin();
 	const json = await req.json().catch(() => ({}));
 	const parsed = defectCreateSchema.safeParse(json);
-	if (!parsed.success) return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+	if (!parsed.success) {
+		return NextResponse.json(
+			{
+				error: "Invalid payload",
+				issues: parsed.error.flatten()
+			},
+			{ status: 400 }
+		);
+	}
 	try {
 		const created = await prisma.defect.create({ data: parsed.data });
 		return NextResponse.json(created);

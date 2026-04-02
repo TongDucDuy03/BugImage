@@ -8,6 +8,18 @@ import StagedMediaManager, { StagedItem } from "./StagedMediaManager";
 
 export default function NewDefectPage() {
 	const router = useRouter();
+
+	function normalizeSlug(input: string) {
+		return input
+			.toLowerCase()
+			.trim()
+			.replace(/[^a-z0-9-]+/g, "-")
+			.replace(/-+/g, "-")
+			.replace(/^-|-$/g, "");
+	}
+
+	const slugRegex = /^[a-z0-9-]+$/;
+
 	const [form, setForm] = useState({
 		code: "",
 		name: "",
@@ -36,17 +48,29 @@ export default function NewDefectPage() {
 			setError("Vui lòng thêm ít nhất 1 media trước khi tạo.");
 			return;
 		}
+
+		const finalSlug = normalizeSlug(form.slug);
+		if (!finalSlug || !slugRegex.test(finalSlug)) {
+			setError("Slug không hợp lệ. Chỉ cho phép chữ thường, số và dấu '-'. Ví dụ: solder-bridge");
+			return;
+		}
+
 		setSubmitting(true);
 		setError(null);
 		// Tạo defect
 		const res = await fetch("/api/defects", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(form)
+			body: JSON.stringify({ ...form, slug: finalSlug })
 		});
 		if (!res.ok) {
 			setSubmitting(false);
-			setError("Tạo thất bại");
+			const data = await res.json().catch(() => ({}));
+			setError(
+				data?.issues?.formErrors?.[0] ||
+					data?.error ||
+					"Tạo thất bại (vui lòng kiểm tra các trường: code/name/slug/severity)"
+			);
 			return;
 		}
 		const d: Defect = await res.json();
@@ -94,7 +118,7 @@ export default function NewDefectPage() {
 						className="w-full rounded-md bg-bg-muted border border-bg-muted/50 px-3 py-2"
 						required
 						value={form.slug}
-						onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+						onChange={(e) => setForm((f) => ({ ...f, slug: normalizeSlug(e.target.value) }))}
 					/>
 				</div>
 				<div>
