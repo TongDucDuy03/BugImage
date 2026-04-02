@@ -1,0 +1,7 @@
+{
+  "/page": "app/page.js",
+  "/defects/[slug]/page": "app/defects/[slug]/page.js",
+  "/admin/defects/page": "app/admin/defects/page.js",
+  "/admin/defects/[id]/edit/page": "app/admin/defects/[id]/edit/page.js",
+  "/admin/defects/new/page": "app/admin/defects/new/page.js"
+}
