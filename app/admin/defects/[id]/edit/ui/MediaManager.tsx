@@ -6,20 +6,25 @@ export default function MediaManager({ defectId, images }: { defectId: string; i
 	const [items, setItems] = useState(images);
 	const [uploading, setUploading] = useState(false);
 	const [reordering, setReordering] = useState(false);
+	const [error, setError] = useState<string | null>(null);
 
 	async function uploadNew(e: React.ChangeEvent<HTMLInputElement>) {
 		const file = e.target.files?.[0];
 		if (!file) return;
+		setError(null);
 		setUploading(true);
 		const fd = new FormData();
 		fd.append("file", file);
 		fd.append("defectId", defectId);
 		const r = await fetch("/api/uploads", { method: "POST", body: fd });
 		setUploading(false);
-		if (r.ok) {
-			const created = await r.json();
-			setItems((prev) => [...prev, created]);
+		if (!r.ok) {
+			const data = await r.json().catch(() => null);
+			setError(data?.error || "Tải media thất bại");
+			return;
 		}
+		const created = await r.json();
+		setItems((prev) => [...prev, created]);
 	}
 
 	async function replaceImage(id: string, file: File) {
@@ -78,6 +83,7 @@ export default function MediaManager({ defectId, images }: { defectId: string; i
 
 	return (
 		<div className="card p-4 md:p-5">
+			{error ? <div className="text-danger text-sm mb-3">{error}</div> : null}
 			<div className="flex items-center justify-between mb-3">
 				<label className="rounded-md border border-bg-muted px-3 py-2 cursor-pointer hover:bg-bg-muted">
 					<input type="file" className="hidden" onChange={uploadNew} accept="image/*,video/*" />

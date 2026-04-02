@@ -1,7 +1,38 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { promises as fs } from "fs";
+import path from "path";
+import sharp from "sharp";
 
 const prisma = new PrismaClient();
+
+async function ensurePlaceholderJpg(targetPath: string, label: string) {
+	try {
+		await fs.access(targetPath);
+		return;
+	} catch {
+		// continue
+	}
+
+	await fs.mkdir(path.dirname(targetPath), { recursive: true });
+
+	// Create a lightweight SVG placeholder and render to JPG via sharp.
+	const safe = label.replace(/[<>&]/g, "");
+	const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e5e7eb"/>
+      <stop offset="100%" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#g)"/>
+  <rect x="80" y="80" width="1440" height="840" rx="36" ry="36" fill="white" fill-opacity="0.65" stroke="#cbd5e1"/>
+  <text x="800" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="64" fill="#0f172a" font-weight="700">${safe}</text>
+  <text x="800" y="610" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#475569">Placeholder</text>
+</svg>`;
+
+	await sharp(Buffer.from(svg)).jpeg({ quality: 85 }).toFile(targetPath);
+}
 
 	async function main() {
 	const adminEmail = "admin@gmail.com";
@@ -148,6 +179,15 @@ const prisma = new PrismaClient();
 			isActive: true,
 			sortOrder: i
 		}));
+
+		// Ensure the local files exist so Next/Image doesn't 404.
+		for (let i = 0; i < images.length; i++) {
+			const img = images[i];
+			const uploadRoot = process.env.UPLOAD_DIR || "./public/uploads";
+			const abs = path.resolve(process.cwd(), uploadRoot).replace(/\\/g, "/");
+			const target = path.join(abs, img.fileName);
+			await ensurePlaceholderJpg(target, `${d.name} #${img.sortOrder}`);
+		}
 
 		for (const img of images) {
 			const existing = await prisma.defectImage.findFirst({
