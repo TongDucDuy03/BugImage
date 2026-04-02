@@ -18,6 +18,13 @@ export default function StagedMediaManager({
 	const [items, setItems] = useState<StagedItem[]>([]);
 	const inputRef = useRef<HTMLInputElement | null>(null);
 
+	function generateId() {
+		// Fallback for environments where crypto.randomUUID is not available
+		const c: any = (typeof globalThis !== "undefined" && (globalThis as any).crypto) || undefined;
+		if (c && typeof c.randomUUID === "function") return c.randomUUID();
+		return `id_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+	}
+
 	function emit(next: StagedItem[]) {
 		setItems(next);
 		onChange(next);
@@ -26,7 +33,7 @@ export default function StagedMediaManager({
 	function addFiles(files: FileList | null) {
 		if (!files) return;
 		const arr = Array.from(files).map((f, i) => ({
-			id: crypto.randomUUID(),
+			id: generateId(),
 			file: f,
 			previewUrl: URL.createObjectURL(f),
 			mimeType: f.type,

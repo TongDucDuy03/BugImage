@@ -1,3 +1,14 @@
 ---
 alwaysApply: true
 ---
+# Project Structure
+- Public entry is [app/page.tsx](mdc:app/page.tsx)
+- Detail page is [app/defects/[slug]/page.tsx](mdc:app/defects/[slug]/page.tsx)
+- Admin routes under [app/admin](mdc:app/admin)
+- API route handlers under [app/api](mdc:app/api)
+- Prisma schema at [prisma/schema.prisma](mdc:prisma/schema.prisma)
+- DB client at [lib/db.ts](mdc:lib/db.ts)
+- Auth helpers at [lib/auth.ts](mdc:lib/auth.ts)
+- Validation schemas at [lib/validation.ts](mdc:lib/validation.ts)
+- Storage types at [lib/storage/types.ts](mdc:lib/storage/types.ts) and local adapter at [lib/storage/local.ts](mdc:lib/storage/local.ts)
+- Global styles at [app/globals.css](mdc:app/globals.css)
