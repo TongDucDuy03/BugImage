@@ -9,19 +9,23 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 	await requireAdmin();
 	const form = await req.formData();
 	const file = form.get("file");
-	if (!(file instanceof File)) return NextResponse.json({ error: "file required" }, { status: 400 });
+	const isBlobLike = file && typeof (file as any).arrayBuffer === "function";
+	const fileType = isBlobLike ? (((file as any).type as string | undefined) ?? "application/octet-stream") : undefined;
+	const fileName = isBlobLike ? (((file as any).name as string | undefined) ?? "upload.bin") : undefined;
+	if (!isBlobLike) return NextResponse.json({ error: "file required" }, { status: 400 });
 	const allowed =
-		file.type.startsWith("image/") ||
-		["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo"].includes(file.type);
+		(fileType?.startsWith("image/") ?? false) ||
+		["video/mp4", "video/webm", "video/quicktime", "video/x-msvideo"].includes(fileType || "");
 	if (!allowed) {
 		return NextResponse.json({ error: "Định dạng không hỗ trợ." }, { status: 400 });
 	}
-	const maxBytes = file.type.startsWith("video/") ? 80 * 1024 * 1024 : 20 * 1024 * 1024;
-	if (file.size > maxBytes) return NextResponse.json({ error: "File quá lớn." }, { status: 400 });
-	const buffer = Buffer.from(await file.arrayBuffer());
+	const size = Number((file as any).size ?? 0);
+	const maxBytes = fileType?.startsWith("video/") ? 80 * 1024 * 1024 : 20 * 1024 * 1024;
+	if (size > maxBytes) return NextResponse.json({ error: "File quá lớn." }, { status: 400 });
+	const buffer = Buffer.from(await (file as any).arrayBuffer());
 	const stored = await new LocalStorageAdapter().save(buffer, {
-		originalName: file.name,
-		mimeType: file.type
+		originalName: fileName || "upload.bin",
+		mimeType: fileType || "application/octet-stream"
 	});
 	const updated = await prisma.defectImage.update({
 		where: { id: params.id },
