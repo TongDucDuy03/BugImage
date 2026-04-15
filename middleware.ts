@@ -14,7 +14,8 @@ export function middleware(req: NextRequest) {
 		}
 		try {
 			const parsed = JSON.parse(cookie);
-			if (!parsed?.userId || parsed?.role !== "admin") {
+			const role = parsed?.role as string | undefined;
+			if (!parsed?.userId || (role !== "admin" && role !== "staff")) {
 				const url = req.nextUrl.clone();
 				url.pathname = "/admin/login";
 				return NextResponse.redirect(url);

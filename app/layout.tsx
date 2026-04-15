@@ -2,8 +2,8 @@ import "./globals.css";
 import { ReactNode } from "react";
 
 export const metadata = {
-	title: "BugImage - Trưng bày lỗi sản phẩm",
-	description: "Trưng bày lỗi sản phẩm với trình chiếu đẹp mắt và trang quản trị"
+	title: "Báo cáo lỗi hàng ngày",
+	description: "Dashboard và trình chiếu TV — báo cáo ngày, import Excel, theo dõi lỗi"
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

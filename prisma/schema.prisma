@@ -8,63 +8,102 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Defect {
-  id               String        @id @default(cuid())
-  code             String
-  name             String
-  slug             String        @unique
-  shortDescription String?
-  description      String?
-  cause            String?
-  detectionMethod  String?
-  solution         String?
-  severity         String        // text enum for v1; can refactor to relation
-  defectGroup      String?
-  processStage     String?
-  isActive         Boolean       @default(true)
-  isFeatured       Boolean       @default(false)
-  sortOrder        Int           @default(0)
-  coverImageId     String?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  deletedAt        DateTime?
-
-  images           DefectImage[]
-
-  @@index([isActive, deletedAt, sortOrder, updatedAt])
-  @@index([code])
-}
-
-model DefectImage {
-  id           String    @id @default(cuid())
-  defectId     String
-  fileName     String
-  originalName String
-  mimeType     String
-  fileSize     Int
-  path         String
-  url          String
-  altText      String?
-  isCover      Boolean   @default(false)
-  isActive     Boolean   @default(true)
-  sortOrder    Int       @default(0)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
-
-  defect       Defect    @relation(fields: [defectId], references: [id], onDelete: Cascade)
-
-  @@index([defectId, isActive, deletedAt, sortOrder])
-}
-
 model AdminUser {
   id           String   @id @default(cuid())
   email        String   @unique
   passwordHash String
   fullName     String
-  role         String   @default("admin")
+  role         String   @default("admin") // admin | staff
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  dailyReportsCreated DailyReport[] @relation("ReportCreator")
+  importLogs          ImportLog[]   @relation("ImportUser")
 }
 
+/// Danh mục dùng cho autocomplete: product | customer | steel_grade | workshop | defect_type
+model CatalogItem {
+  id        String   @id @default(cuid())
+  kind      String
+  code      String?
+  name      String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([kind, name])
+  @@index([kind, isActive, sortOrder])
+}
+
+/// Báo cáo tổng hợp theo ngày
+model DailyReport {
+  id             String    @id @default(cuid())
+  reportDate     DateTime  @db.Date
+  receivedDate   DateTime? @db.Date
+  summaryDate    DateTime? @db.Date
+  departmentName String    @default("Phòng nghiên cứu và công nghệ")
+  reportCode     String?
+  createdById    String?
+  status         String    @default("draft") // draft | finalized
+  hideFromTv     Boolean   @default(false)
+  generalNote    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  createdBy  AdminUser?        @relation("ReportCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  lines      DailyReportLine[]
+  importLogs ImportLog[]
+
+  @@unique([reportDate])
+  @@index([status, reportDate])
+  @@index([hideFromTv, reportDate])
+}
+
+/// Chi tiết từng dòng lỗi trong báo cáo ngày
+model DailyReportLine {
+  id            String   @id @default(cuid())
+  dailyReportId String
+  lineNo        Int
+  productName   String?
+  customerName  String?
+  steelGrade    String?
+  inspectedQty  Int?
+  passedQty     Int?
+  passedRate    Float?
+  processedQty  Int?
+  processedRate Float?
+  defectStatus  String?
+  scrapQty      Int?
+  scrapRate     Float?
+  scrapStatus   String?
+  workshopName  String?
+  note          String?
+  sourceType    String   @default("manual") // manual | excel
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  dailyReport DailyReport @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+
+  @@unique([dailyReportId, lineNo])
+  @@index([dailyReportId])
+}
+
+/// Lịch sử import Excel theo báo cáo
+model ImportLog {
+  id            String   @id @default(cuid())
+  fileName      String
+  importedById  String?
+  dailyReportId String
+  totalRows     Int
+  successRows   Int
+  errorRows     Int
+  errorFilePath String?
+  createdAt     DateTime @default(now())
+
+  dailyReport DailyReport @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+  importedBy  AdminUser?  @relation("ImportUser", fields: [importedById], references: [id], onDelete: SetNull)
+
+  @@index([dailyReportId, createdAt])
+}

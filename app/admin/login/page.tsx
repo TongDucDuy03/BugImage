@@ -16,11 +16,17 @@ export default function AdminLoginPage() {
 		const res = await fetch("/api/admin/login", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ email, password })
+			credentials: "same-origin",
+			body: JSON.stringify({ email: email.trim(), password })
 		});
 		setLoading(false);
-		if (res.ok) router.push("/admin/defects");
-		else setError("Invalid credentials");
+		if (res.ok) {
+			router.refresh();
+			router.push("/admin/reports");
+			return;
+		}
+		const data = await res.json().catch(() => ({}));
+		setError(typeof data?.error === "string" ? data.error : "Sai tài khoản hoặc mật khẩu");
 	}
 
 	return (

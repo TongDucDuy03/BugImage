@@ -2,8 +2,9 @@
 alwaysApply: true
 ---
 # Project Structure
-- Public entry is [app/page.tsx](mdc:app/page.tsx)
-- Detail page is [app/defects/[slug]/page.tsx](mdc:app/defects/[slug]/page.tsx)
+- Dashboard công khai: [app/page.tsx](mdc:app/page.tsx) — dữ liệu từ [app/api/public/daily-report-lines/route.ts](mdc:app/api/public/daily-report-lines/route.ts)
+- Trình chiếu TV: [app/tv/page.tsx](mdc:app/tv/page.tsx)
+- Báo cáo ngày (admin): [app/admin/reports](mdc:app/admin/reports)
 - Admin routes under [app/admin](mdc:app/admin)
 - API route handlers under [app/api](mdc:app/api)
 - Prisma schema at [prisma/schema.prisma](mdc:prisma/schema.prisma)
