@@ -20,6 +20,8 @@ model AdminUser {
 
   dailyReportsCreated DailyReport[] @relation("ReportCreator")
   importLogs          ImportLog[]   @relation("ImportUser")
+  qualityIssueGroupsCreated QualityIssueGroup[]     @relation("QualityIssueGroupCreator")
+  qualityIssueImportLogs    QualityIssueImportLog[] @relation("QualityIssueImportUser")
 }
 
 /// Danh mục dùng cho autocomplete: product | customer | steel_grade | workshop | defect_type
@@ -106,4 +108,75 @@ model ImportLog {
   importedBy  AdminUser?  @relation("ImportUser", fields: [importedById], references: [id], onDelete: SetNull)
 
   @@index([dailyReportId, createdAt])
+}
+
+model QualityIssueGroup {
+  id                     String   @id @default(cuid())
+  productName            String
+  productNameNormalized  String
+  customerName           String?
+  customerNameNormalized String?
+  steelGrade             String?
+  sortOrder              Int      @default(0)
+  isActive               Boolean  @default(true)
+  hideFromTv             Boolean  @default(false)
+  createdById            String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  createdBy AdminUser?          @relation("QualityIssueGroupCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  lines     QualityIssueLine[]
+
+  @@index([sortOrder])
+  @@index([isActive, sortOrder])
+  @@index([hideFromTv, sortOrder])
+  @@index([productNameNormalized])
+  @@index([productNameNormalized, customerNameNormalized, steelGrade])
+}
+
+model QualityIssueLine {
+  id             String   @id @default(cuid())
+  groupId        String
+  lineOrder      Int
+  defectRateText String?
+  defectName     String?
+  actionPlan     String?
+  progressStatus String?
+  deadlineText   String?
+  ownerName      String?
+  note           String?
+  styles         Json?
+  sourceType     String   @default("manual") // manual | excel_import
+  importLogId    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  group     QualityIssueGroup      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  importLog QualityIssueImportLog? @relation(fields: [importLogId], references: [id], onDelete: SetNull)
+
+  @@index([groupId, lineOrder])
+  @@index([importLogId])
+  @@unique([groupId, lineOrder])
+}
+
+model QualityIssueImportLog {
+  id                   String   @id @default(cuid())
+  fileName             String
+  importedById         String?
+  totalRows            Int
+  successRows          Int
+  errorRows            Int
+  createdNewGroups     Int      @default(0)
+  appendedExistingGroups Int    @default(0)
+  skippedRows          Int      @default(0)
+  mode                 String   @default("append") // append | upsert
+  errorDetailJson      Json?
+  errorFilePath        String?
+  createdAt            DateTime @default(now())
+
+  importedBy AdminUser?          @relation("QualityIssueImportUser", fields: [importedById], references: [id], onDelete: SetNull)
+  lines      QualityIssueLine[]
+
+  @@index([createdAt])
+  @@index([importedById, createdAt])
 }
