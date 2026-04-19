@@ -12,9 +12,12 @@ export const QUALITY_ISSUE_STYLE_FIELDS = [
 
 export const QUALITY_ISSUE_WARNING_BG_FIELDS = ["defectRateText", "defectName"] as const;
 export const QUALITY_ISSUE_WARNING_BG_COLOR = "#5A0B2B";
+export const QUALITY_ISSUE_IMPORTED_RED_TEXT_FIELDS = ["actionPlan", "progressStatus", "deadlineText", "note"] as const;
+export const QUALITY_ISSUE_RED_TEXT_COLOR = "#C00000";
 
 export type QualityIssueStyleField = (typeof QUALITY_ISSUE_STYLE_FIELDS)[number];
 export type QualityIssueWarningBgField = (typeof QUALITY_ISSUE_WARNING_BG_FIELDS)[number];
+export type QualityIssueImportedRedTextField = (typeof QUALITY_ISSUE_IMPORTED_RED_TEXT_FIELDS)[number];
 
 export type QualityIssueCellStyle = {
 	bgColor?: string | null;
@@ -102,6 +105,10 @@ export function isQualityIssueWarningBgField(field: QualityIssueStyleField): fie
 	return (QUALITY_ISSUE_WARNING_BG_FIELDS as readonly string[]).includes(field);
 }
 
+export function isQualityIssueImportedRedTextField(field: QualityIssueStyleField): field is QualityIssueImportedRedTextField {
+	return (QUALITY_ISSUE_IMPORTED_RED_TEXT_FIELDS as readonly string[]).includes(field);
+}
+
 export function sanitizeLineStyles(styles: QualityIssueLineStyles | null | undefined) {
 	if (!styles) return null;
 	const out: QualityIssueLineStyles = {};
@@ -112,8 +119,9 @@ export function sanitizeLineStyles(styles: QualityIssueLineStyles | null | undef
 		const fontColor = sanitizeStyleColor(style.fontColor ?? undefined);
 		const bold = typeof style.bold === "boolean" ? style.bold : null;
 		const normalizedBgColor = bgColor && isQualityIssueWarningBgField(field) ? QUALITY_ISSUE_WARNING_BG_COLOR : null;
-		if (normalizedBgColor || fontColor || bold != null) {
-			out[field] = { bgColor: normalizedBgColor, fontColor, bold };
+		const normalizedFontColor = fontColor && isQualityIssueImportedRedTextField(field) ? QUALITY_ISSUE_RED_TEXT_COLOR : fontColor;
+		if (normalizedBgColor || normalizedFontColor || bold != null) {
+			out[field] = { bgColor: normalizedBgColor, fontColor: normalizedFontColor, bold };
 		}
 	}
 	return Object.keys(out).length ? out : null;

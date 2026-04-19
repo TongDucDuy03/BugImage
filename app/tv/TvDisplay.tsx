@@ -160,9 +160,9 @@ export function TvDisplay() {
 			<header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-6 py-4">
 				<div>
 					<div className="text-xs uppercase tracking-[0.2em] text-slate-400">Quality Issue Tracker</div>
-					<div className="text-3xl font-semibold tracking-tight">Trình chiếu TV</div>
+					<div className="text-3xl font-semibold tracking-tight">Các hạng mục theo dõi hàng lỗi chất lượng</div>
 					<div className="mt-1 text-sm text-slate-300">
-						{clock.toLocaleString("vi-VN")} - Danh sách theo dõi hàng lỗi chất lượng
+						{clock.toLocaleString("vi-VN")}
 					</div>
 				</div>
 				<div className="flex flex-wrap items-center justify-end gap-2 text-sm text-slate-300">

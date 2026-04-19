@@ -5,8 +5,10 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { QualityIssueGroupPayload, QualityIssueLinePayload, QualityIssueLineStyles, QualityIssueStyleField } from "@/lib/quality-issues";
 import {
+	QUALITY_ISSUE_IMPORTED_RED_TEXT_FIELDS,
 	isQualityIssueWarningBgField,
 	normalizeQualityLookupText,
+	QUALITY_ISSUE_RED_TEXT_COLOR,
 	QUALITY_ISSUE_WARNING_BG_COLOR
 } from "@/lib/quality-issues";
 
@@ -93,7 +95,7 @@ const tableHeadCellClass =
 const tableGroupCellClass = "border-r border-slate-200 px-2 py-2 align-top";
 const tableLineCellClass = "border-r border-slate-200 px-2 py-2 align-top last:border-r-0";
 const inlineCheckboxLabelClass = "flex items-center gap-2 text-[11px] leading-4 text-slate-600";
-const redTextStyleFields: QualityIssueStyleField[] = ["defectRateText", "defectName", "actionPlan", "progressStatus", "deadlineText", "note"];
+const redTextStyleFields: QualityIssueStyleField[] = [...QUALITY_ISSUE_IMPORTED_RED_TEXT_FIELDS];
 
 function hasWarningBg(styles: QualityIssueLineStyles | null | undefined) {
 	return Boolean(
@@ -109,9 +111,9 @@ function hasWarningBg(styles: QualityIssueLineStyles | null | undefined) {
 function hasRedText(styles: QualityIssueLineStyles | null | undefined) {
 	return Boolean(
 		styles &&
-			Object.values(styles).some((style) => {
-				const color = style?.fontColor?.toLowerCase();
-				return Boolean(color && ["#c00000", "#ff0000", "#9c0006"].includes(color));
+			redTextStyleFields.some((field) => {
+				const color = styles[field]?.fontColor?.toLowerCase();
+				return Boolean(color && [QUALITY_ISSUE_RED_TEXT_COLOR.toLowerCase(), "#ff0000", "#9c0006"].includes(color));
 			})
 	);
 }
@@ -124,7 +126,7 @@ function buildPresetStyles(warningBg: boolean, redText: boolean): QualityIssueLi
 		for (const field of redTextStyleFields) {
 			styles[field] = {
 				bgColor: null,
-				fontColor: "#c00000",
+				fontColor: QUALITY_ISSUE_RED_TEXT_COLOR,
 				bold: true
 			};
 		}

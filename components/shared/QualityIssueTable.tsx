@@ -10,18 +10,24 @@ import {
 
 const tvColumnWidths = ["70px", "240px", "150px", "120px", "130px", "240px", "320px", "180px", "130px", "120px", "260px"];
 const publicColumnWidths = ["4%", "14%", "9%", "7%", "7%", "13%", "17%", "12%", "6%", "5.5%", "5.5%"];
-const warningTextFallback = "#FFF8F1";
+const tvWarningTextFallback = "#FFF8F1";
+const publicWarningBackground = "#F7E3EA";
+const publicWarningTextFallback = "#8B2441";
 
 function getColumnWidths(variant: "public" | "tv") {
 	return variant === "tv" ? tvColumnWidths : publicColumnWidths;
 }
 
-function toInlineStyle(field: QualityIssueStyleField, style: QualityIssueCellStyle | null | undefined): CSSProperties | undefined {
+function toInlineStyle(
+	variant: "public" | "tv",
+	field: QualityIssueStyleField,
+	style: QualityIssueCellStyle | null | undefined
+): CSSProperties | undefined {
 	if (!style) return undefined;
 	const hasWarningBackground = isQualityIssueWarningBgField(field) && Boolean(style.bgColor);
 	return {
-		backgroundColor: hasWarningBackground ? style.bgColor ?? undefined : undefined,
-		color: style.fontColor ?? (hasWarningBackground ? warningTextFallback : undefined),
+		backgroundColor: hasWarningBackground ? (variant === "public" ? publicWarningBackground : style.bgColor ?? undefined) : undefined,
+		color: style.fontColor ?? (hasWarningBackground ? (variant === "public" ? publicWarningTextFallback : tvWarningTextFallback) : undefined),
 		fontWeight: style.bold ? 700 : undefined
 	};
 }
@@ -68,7 +74,7 @@ function renderLineCell(
 	extraClass = ""
 ) {
 	return (
-		<td className={`${themedClass(variant, "line")} ${extraClass}`} style={toInlineStyle(field, style)}>
+		<td className={`${themedClass(variant, "line")} ${extraClass}`} style={toInlineStyle(variant, field, style)}>
 			<div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{value ?? "—"}</div>
 		</td>
 	);
