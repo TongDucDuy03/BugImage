@@ -12,12 +12,13 @@ export const QUALITY_ISSUE_STYLE_FIELDS = [
 
 export const QUALITY_ISSUE_WARNING_BG_FIELDS = ["defectRateText", "defectName"] as const;
 export const QUALITY_ISSUE_WARNING_BG_COLOR = "#5A0B2B";
-export const QUALITY_ISSUE_IMPORTED_RED_TEXT_FIELDS = ["actionPlan", "progressStatus", "deadlineText", "note"] as const;
-export const QUALITY_ISSUE_RED_TEXT_COLOR = "#C00000";
+export const QUALITY_ISSUE_AUTO_RED_TEXT_FIELDS = ["actionPlan", "progressStatus", "deadlineText", "note"] as const;
+export const QUALITY_ISSUE_AUTO_RED_TEXT_COLOR = "#C00000";
+export const QUALITY_ISSUE_AUTO_BLUE_TEXT_COLOR = "#2F75B5";
 
 export type QualityIssueStyleField = (typeof QUALITY_ISSUE_STYLE_FIELDS)[number];
 export type QualityIssueWarningBgField = (typeof QUALITY_ISSUE_WARNING_BG_FIELDS)[number];
-export type QualityIssueImportedRedTextField = (typeof QUALITY_ISSUE_IMPORTED_RED_TEXT_FIELDS)[number];
+export type QualityIssueAutoRedTextField = (typeof QUALITY_ISSUE_AUTO_RED_TEXT_FIELDS)[number];
 
 export type QualityIssueCellStyle = {
 	bgColor?: string | null;
@@ -105,8 +106,51 @@ export function isQualityIssueWarningBgField(field: QualityIssueStyleField): fie
 	return (QUALITY_ISSUE_WARNING_BG_FIELDS as readonly string[]).includes(field);
 }
 
-export function isQualityIssueImportedRedTextField(field: QualityIssueStyleField): field is QualityIssueImportedRedTextField {
-	return (QUALITY_ISSUE_IMPORTED_RED_TEXT_FIELDS as readonly string[]).includes(field);
+export function isQualityIssueAutoRedTextField(field: QualityIssueStyleField): field is QualityIssueAutoRedTextField {
+	return (QUALITY_ISSUE_AUTO_RED_TEXT_FIELDS as readonly string[]).includes(field);
+}
+
+function normalizeQualityHighlightText(input: string | null | undefined) {
+	if (!input) return null;
+	const normalized = String(input)
+		.normalize("NFD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.replace(/đ/g, "d")
+		.replace(/Đ/g, "D")
+		.toLowerCase()
+		.replace(/[^\p{L}\p{N}]+/gu, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+	return normalized || null;
+}
+
+export function shouldAutoRedText(field: QualityIssueStyleField, value: string | null | undefined) {
+	if (!isQualityIssueAutoRedTextField(field)) return false;
+	const normalized = normalizeQualityHighlightText(value);
+	if (!normalized) return false;
+
+	return (
+		normalized === "dang tim hieu" ||
+		normalized === "dang cap nhat" ||
+		normalized === "chua co bien phap" ||
+		normalized === "chua thong nhat" ||
+		normalized === "chua co" ||
+		normalized.startsWith("cho") ||
+		normalized.includes("dang tim nguyen nhan")
+	);
+}
+
+export function shouldAutoBlueText(field: QualityIssueStyleField, value: string | null | undefined) {
+	if (!isQualityIssueAutoRedTextField(field)) return false;
+	const normalized = normalizeQualityHighlightText(value);
+	if (!normalized) return false;
+	return normalized.includes("da duc het");
+}
+
+export function getQualityIssueAutoTextColor(field: QualityIssueStyleField, value: string | null | undefined) {
+	if (shouldAutoBlueText(field, value)) return QUALITY_ISSUE_AUTO_BLUE_TEXT_COLOR;
+	if (shouldAutoRedText(field, value)) return QUALITY_ISSUE_AUTO_RED_TEXT_COLOR;
+	return null;
 }
 
 export function sanitizeLineStyles(styles: QualityIssueLineStyles | null | undefined) {
@@ -116,12 +160,10 @@ export function sanitizeLineStyles(styles: QualityIssueLineStyles | null | undef
 		const style = styles[field];
 		if (!style) continue;
 		const bgColor = sanitizeStyleColor(style.bgColor ?? undefined);
-		const fontColor = sanitizeStyleColor(style.fontColor ?? undefined);
 		const bold = typeof style.bold === "boolean" ? style.bold : null;
 		const normalizedBgColor = bgColor && isQualityIssueWarningBgField(field) ? QUALITY_ISSUE_WARNING_BG_COLOR : null;
-		const normalizedFontColor = fontColor && isQualityIssueImportedRedTextField(field) ? QUALITY_ISSUE_RED_TEXT_COLOR : fontColor;
-		if (normalizedBgColor || normalizedFontColor || bold != null) {
-			out[field] = { bgColor: normalizedBgColor, fontColor: normalizedFontColor, bold };
+		if (normalizedBgColor || bold != null) {
+			out[field] = { bgColor: normalizedBgColor, fontColor: null, bold };
 		}
 	}
 	return Object.keys(out).length ? out : null;

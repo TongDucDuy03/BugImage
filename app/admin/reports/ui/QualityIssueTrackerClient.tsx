@@ -5,10 +5,9 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { QualityIssueGroupPayload, QualityIssueLinePayload, QualityIssueLineStyles, QualityIssueStyleField } from "@/lib/quality-issues";
 import {
-	QUALITY_ISSUE_IMPORTED_RED_TEXT_FIELDS,
+	getQualityIssueAutoTextColor,
 	isQualityIssueWarningBgField,
 	normalizeQualityLookupText,
-	QUALITY_ISSUE_RED_TEXT_COLOR,
 	QUALITY_ISSUE_WARNING_BG_COLOR
 } from "@/lib/quality-issues";
 
@@ -58,7 +57,6 @@ type FormState = {
 	ownerName: string;
 	note: string;
 	warningBg: boolean;
-	redText: boolean;
 };
 
 const emptyForm: FormState = {
@@ -72,8 +70,7 @@ const emptyForm: FormState = {
 	deadlineText: "",
 	ownerName: "",
 	note: "",
-	warningBg: false,
-	redText: false
+	warningBg: false
 };
 
 const tableColumnWidths = ["52px", "176px", "124px", "88px", "104px", "168px", "220px", "176px", "104px", "112px", "168px", "132px"];
@@ -95,7 +92,6 @@ const tableHeadCellClass =
 const tableGroupCellClass = "border-r border-slate-200 px-2 py-2 align-top";
 const tableLineCellClass = "border-r border-slate-200 px-2 py-2 align-top last:border-r-0";
 const inlineCheckboxLabelClass = "flex items-center gap-2 text-[11px] leading-4 text-slate-600";
-const redTextStyleFields: QualityIssueStyleField[] = [...QUALITY_ISSUE_IMPORTED_RED_TEXT_FIELDS];
 
 function hasWarningBg(styles: QualityIssueLineStyles | null | undefined) {
 	return Boolean(
@@ -108,41 +104,17 @@ function hasWarningBg(styles: QualityIssueLineStyles | null | undefined) {
 	);
 }
 
-function hasRedText(styles: QualityIssueLineStyles | null | undefined) {
-	return Boolean(
-		styles &&
-			redTextStyleFields.some((field) => {
-				const color = styles[field]?.fontColor?.toLowerCase();
-				return Boolean(color && [QUALITY_ISSUE_RED_TEXT_COLOR.toLowerCase(), "#ff0000", "#9c0006"].includes(color));
-			})
-	);
+function autoTextStyle(field: QualityIssueStyleField, value: string) {
+	const color = getQualityIssueAutoTextColor(field, value);
+	return color ? { color } : undefined;
 }
 
-function buildPresetStyles(warningBg: boolean, redText: boolean): QualityIssueLineStyles | null {
-	if (!warningBg && !redText) return null;
-	const styles: QualityIssueLineStyles = {};
-
-	if (redText) {
-		for (const field of redTextStyleFields) {
-			styles[field] = {
-				bgColor: null,
-				fontColor: QUALITY_ISSUE_RED_TEXT_COLOR,
-				bold: true
-			};
-		}
-	}
-
-	if (warningBg) {
-		for (const field of ["defectRateText", "defectName"] as const) {
-			styles[field] = {
-				...(styles[field] ?? {}),
-				bgColor: QUALITY_ISSUE_WARNING_BG_COLOR,
-				bold: true
-			};
-		}
-	}
-
-	return Object.keys(styles).length ? styles : null;
+function buildPresetStyles(warningBg: boolean): QualityIssueLineStyles | null {
+	if (!warningBg) return null;
+	return {
+		defectRateText: { bgColor: QUALITY_ISSUE_WARNING_BG_COLOR, fontColor: null, bold: true },
+		defectName: { bgColor: QUALITY_ISSUE_WARNING_BG_COLOR, fontColor: null, bold: true }
+	};
 }
 
 function defaultLineDraft(line: QualityIssueLinePayload) {
@@ -154,8 +126,7 @@ function defaultLineDraft(line: QualityIssueLinePayload) {
 		deadlineText: line.deadlineText ?? "",
 		ownerName: line.ownerName ?? "",
 		note: line.note ?? "",
-		warningBg: hasWarningBg(line.styles),
-		redText: hasRedText(line.styles)
+		warningBg: hasWarningBg(line.styles)
 	};
 }
 
@@ -186,7 +157,6 @@ export function QualityIssueTrackerClient({
 				ownerName: string;
 				note: string;
 				warningBg: boolean;
-				redText: boolean;
 			}
 		>
 	>({});
@@ -265,7 +235,7 @@ export function QualityIssueTrackerClient({
 				deadlineText: form.deadlineText || null,
 				ownerName: form.ownerName || null,
 				note: form.note || null,
-				styles: buildPresetStyles(form.warningBg, form.redText),
+				styles: buildPresetStyles(form.warningBg),
 				sourceType: "manual"
 			})
 		});
@@ -333,7 +303,7 @@ export function QualityIssueTrackerClient({
 				deadlineText: draft.deadlineText || null,
 				ownerName: draft.ownerName || null,
 				note: draft.note || null,
-				styles: buildPresetStyles(draft.warningBg, draft.redText)
+				styles: buildPresetStyles(draft.warningBg)
 			})
 		});
 		setBusy(null);
@@ -467,7 +437,12 @@ export function QualityIssueTrackerClient({
 					</label>
 					<label className="text-[12px] font-medium text-slate-700">
 						<span className="admin-label">Hạn định</span>
-						<input className="admin-input" value={form.deadlineText} onChange={(e) => setForm((draft) => ({ ...draft, deadlineText: e.target.value }))} />
+						<input
+							className="admin-input"
+							style={autoTextStyle("deadlineText", form.deadlineText)}
+							value={form.deadlineText}
+							onChange={(e) => setForm((draft) => ({ ...draft, deadlineText: e.target.value }))}
+						/>
 					</label>
 					<label className="text-[12px] font-medium text-slate-700 xl:col-span-3">
 						<span className="admin-label">Tên lỗi</span>
@@ -479,15 +454,30 @@ export function QualityIssueTrackerClient({
 					</label>
 					<label className="text-[12px] font-medium text-slate-700 xl:col-span-2">
 						<span className="admin-label">Biện pháp</span>
-						<textarea className="admin-textarea admin-textarea-sm" value={form.actionPlan} onChange={(e) => setForm((draft) => ({ ...draft, actionPlan: e.target.value }))} />
+						<textarea
+							className="admin-textarea admin-textarea-sm"
+							style={autoTextStyle("actionPlan", form.actionPlan)}
+							value={form.actionPlan}
+							onChange={(e) => setForm((draft) => ({ ...draft, actionPlan: e.target.value }))}
+						/>
 					</label>
 					<label className="text-[12px] font-medium text-slate-700 xl:col-span-3">
 						<span className="admin-label">Tình trạng tiến độ</span>
-						<textarea className="admin-textarea admin-textarea-sm" value={form.progressStatus} onChange={(e) => setForm((draft) => ({ ...draft, progressStatus: e.target.value }))} />
+						<textarea
+							className="admin-textarea admin-textarea-sm"
+							style={autoTextStyle("progressStatus", form.progressStatus)}
+							value={form.progressStatus}
+							onChange={(e) => setForm((draft) => ({ ...draft, progressStatus: e.target.value }))}
+						/>
 					</label>
 					<label className="text-[12px] font-medium text-slate-700 xl:col-span-3">
 						<span className="admin-label">Ghi chú</span>
-						<textarea className="admin-textarea admin-textarea-sm" value={form.note} onChange={(e) => setForm((draft) => ({ ...draft, note: e.target.value }))} />
+						<textarea
+							className="admin-textarea admin-textarea-sm"
+							style={autoTextStyle("note", form.note)}
+							value={form.note}
+							onChange={(e) => setForm((draft) => ({ ...draft, note: e.target.value }))}
+						/>
 					</label>
 				</div>
 
@@ -502,15 +492,6 @@ export function QualityIssueTrackerClient({
 							/>
 							Nền cảnh báo
 						</label>
-						<label className={inlineCheckboxLabelClass}>
-							<input
-								type="checkbox"
-								className="admin-checkbox"
-								checked={form.redText}
-								onChange={(e) => setForm((draft) => ({ ...draft, redText: e.target.checked }))}
-							/>
-							Chữ đỏ
-						</label>
 					</div>
 					<button type="button" disabled={busy === "create" || !form.productName.trim()} className={primaryButtonClass} onClick={() => void createManualLine()}>
 						{busy === "create" ? "Đang thêm..." : "Thêm dòng"}
@@ -523,8 +504,8 @@ export function QualityIssueTrackerClient({
 					<div className="min-w-0 space-y-1">
 						<h2 className="admin-section-title">Import Excel theo mẫu mới</h2>
 						<p className="admin-copy">
-							Hỗ trợ file có merge cell theo sản phẩm và cố gắng giữ nền màu hoặc chữ đỏ tại các ô cần theo dõi, nhưng giao diện preview được nén gọn hơn để
-							dễ xem trên laptop.
+							Hỗ trợ file có merge cell theo sản phẩm và giữ nền cảnh báo tại các ô cần theo dõi, nhưng giao diện preview được nén gọn hơn để dễ xem trên laptop.
+							Các cụm trạng thái cảnh báo sẽ tự đổi sang chữ đỏ theo quy tắc nội dung sau khi import.
 						</p>
 					</div>
 					<div className="flex flex-wrap items-center gap-2 xl:justify-end">
@@ -798,6 +779,7 @@ export function QualityIssueTrackerClient({
 												<td className={tableLineCellClass}>
 													<textarea
 														className="admin-inline-textarea"
+														style={autoTextStyle("actionPlan", currentLineDraft.actionPlan)}
 														value={currentLineDraft.actionPlan}
 														onChange={(e) => setLineField(line.id, "actionPlan", e.target.value, line)}
 													/>
@@ -805,6 +787,7 @@ export function QualityIssueTrackerClient({
 												<td className={`${tableLineCellClass} bg-sky-50/75`}>
 													<textarea
 														className="admin-inline-textarea admin-inline-textarea-compact"
+														style={autoTextStyle("progressStatus", currentLineDraft.progressStatus)}
 														value={currentLineDraft.progressStatus}
 														onChange={(e) => setLineField(line.id, "progressStatus", e.target.value, line)}
 													/>
@@ -812,6 +795,7 @@ export function QualityIssueTrackerClient({
 												<td className={tableLineCellClass}>
 													<input
 														className="admin-inline-input"
+														style={autoTextStyle("deadlineText", currentLineDraft.deadlineText)}
 														value={currentLineDraft.deadlineText}
 														onChange={(e) => setLineField(line.id, "deadlineText", e.target.value, line)}
 													/>
@@ -826,6 +810,7 @@ export function QualityIssueTrackerClient({
 												<td className={tableLineCellClass}>
 													<textarea
 														className="admin-inline-textarea"
+														style={autoTextStyle("note", currentLineDraft.note)}
 														value={currentLineDraft.note}
 														onChange={(e) => setLineField(line.id, "note", e.target.value, line)}
 													/>
@@ -840,15 +825,6 @@ export function QualityIssueTrackerClient({
 																onChange={(e) => setLineField(line.id, "warningBg", e.target.checked, line)}
 															/>
 															Nền cảnh báo
-														</label>
-														<label className={inlineCheckboxLabelClass}>
-															<input
-																type="checkbox"
-																className="admin-checkbox"
-																checked={currentLineDraft.redText}
-																onChange={(e) => setLineField(line.id, "redText", e.target.checked, line)}
-															/>
-															Chữ đỏ
 														</label>
 														<div className="flex flex-wrap gap-1.5 pt-0.5">
 															<button

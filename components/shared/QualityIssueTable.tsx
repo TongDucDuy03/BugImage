@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from "react";
 import {
+	getQualityIssueAutoTextColor,
 	isQualityIssueWarningBgField,
 	type QualityIssueCellStyle,
 	type QualityIssueGroupPayload,
@@ -21,14 +22,22 @@ function getColumnWidths(variant: "public" | "tv") {
 function toInlineStyle(
 	variant: "public" | "tv",
 	field: QualityIssueStyleField,
+	value: string | null,
 	style: QualityIssueCellStyle | null | undefined
 ): CSSProperties | undefined {
-	if (!style) return undefined;
-	const hasWarningBackground = isQualityIssueWarningBgField(field) && Boolean(style.bgColor);
+	const autoTextColor = getQualityIssueAutoTextColor(field, value);
+	const hasWarningBackground = isQualityIssueWarningBgField(field) && Boolean(style?.bgColor);
+	if (!style && !autoTextColor) return undefined;
 	return {
-		backgroundColor: hasWarningBackground ? (variant === "public" ? publicWarningBackground : style.bgColor ?? undefined) : undefined,
-		color: style.fontColor ?? (hasWarningBackground ? (variant === "public" ? publicWarningTextFallback : tvWarningTextFallback) : undefined),
-		fontWeight: style.bold ? 700 : undefined
+		backgroundColor: hasWarningBackground ? (variant === "public" ? publicWarningBackground : style?.bgColor ?? undefined) : undefined,
+		color: autoTextColor
+			? autoTextColor
+			: hasWarningBackground
+				? variant === "public"
+					? publicWarningTextFallback
+					: tvWarningTextFallback
+				: undefined,
+		fontWeight: style?.bold ? 700 : undefined
 	};
 }
 
@@ -74,7 +83,7 @@ function renderLineCell(
 	extraClass = ""
 ) {
 	return (
-		<td className={`${themedClass(variant, "line")} ${extraClass}`} style={toInlineStyle(variant, field, style)}>
+		<td className={`${themedClass(variant, "line")} ${extraClass}`} style={toInlineStyle(variant, field, value, style)}>
 			<div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{value ?? "—"}</div>
 		</td>
 	);
