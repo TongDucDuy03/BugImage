@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { QualityIssueGroupPayload, QualityIssueLinePayload, QualityIssueLineStyles, QualityIssueStyleField } from "@/lib/quality-issues";
 import {
@@ -73,7 +73,7 @@ const emptyForm: FormState = {
 	warningBg: false
 };
 
-const tableColumnWidths = ["52px", "176px", "124px", "88px", "104px", "168px", "220px", "176px", "104px", "112px", "168px", "132px"];
+const tableColumnWidths = ["42px", "52px", "176px", "124px", "88px", "104px", "168px", "220px", "176px", "104px", "112px", "168px", "148px"];
 
 const headerLinkClass = "text-[12px] font-medium text-sky-700 transition hover:text-sky-800 hover:underline";
 const primaryButtonClass =
@@ -160,6 +160,7 @@ export function QualityIssueTrackerClient({
 			}
 		>
 	>({});
+	const [selectedLineIds, setSelectedLineIds] = useState<string[]>([]);
 
 	const existingGroupMatch = useMemo(() => {
 		const productKey = normalizeQualityLookupText(form.productName);
@@ -177,6 +178,28 @@ export function QualityIssueTrackerClient({
 	}, [form.customerName, form.productName, form.steelGrade, groups]);
 
 	const totalLines = useMemo(() => groups.reduce((sum, group) => sum + group.lines.length, 0), [groups]);
+	const allLineIds = useMemo(() => groups.flatMap((group) => group.lines.map((line) => line.id)), [groups]);
+	const lineIdSet = useMemo(() => new Set(allLineIds), [allLineIds]);
+	const selectedLineIdSet = useMemo(() => new Set(selectedLineIds), [selectedLineIds]);
+	const selectedLineCount = selectedLineIds.length;
+	const selectedGroupIds = useMemo(
+		() =>
+			Array.from(
+				new Set(
+					groups
+						.filter((group) => group.lines.some((line) => selectedLineIdSet.has(line.id)))
+						.map((group) => group.groupId)
+				)
+			),
+		[groups, selectedLineIdSet]
+	);
+	const selectedGroupCount = selectedGroupIds.length;
+	const allVisibleSelected = allLineIds.length > 0 && allLineIds.every((id) => selectedLineIdSet.has(id));
+	const bulkBusy = busy === "bulk-delete" || busy === "bulk-hide" || busy === "bulk-show";
+
+	useEffect(() => {
+		setSelectedLineIds((current) => current.filter((id) => lineIdSet.has(id)));
+	}, [lineIdSet]);
 
 	function groupDraft(group: QualityIssueGroupPayload) {
 		return groupDrafts[group.groupId] ?? {
@@ -212,6 +235,28 @@ export function QualityIssueTrackerClient({
 				[field]: value as never
 			}
 		}));
+	}
+
+	function toggleLineSelection(lineId: string, checked: boolean) {
+		setSelectedLineIds((current) => {
+			if (checked) return current.includes(lineId) ? current : [...current, lineId];
+			return current.filter((id) => id !== lineId);
+		});
+	}
+
+	function toggleAllLineSelection(checked: boolean) {
+		setSelectedLineIds(checked ? allLineIds : []);
+	}
+
+	function toggleGroupSelection(group: QualityIssueGroupPayload, checked: boolean) {
+		const groupLineIds = group.lines.map((line) => line.id);
+		setSelectedLineIds((current) => {
+			if (checked) {
+				return Array.from(new Set([...current, ...groupLineIds]));
+			}
+			const groupLineIdSet = new Set(groupLineIds);
+			return current.filter((id) => !groupLineIdSet.has(id));
+		});
 	}
 
 	async function refreshPage() {
@@ -326,6 +371,80 @@ export function QualityIssueTrackerClient({
 			setError(data?.error ?? "Không xóa được dòng.");
 			return;
 		}
+		await refreshPage();
+	}
+
+	async function bulkToggleTv(hideFromTv: boolean) {
+		if (selectedGroupIds.length === 0) return;
+		setBusy(hideFromTv ? "bulk-hide" : "bulk-show");
+		setError(null);
+
+		let successCount = 0;
+		let failedMessage: string | null = null;
+
+		for (const groupId of selectedGroupIds) {
+			const res = await fetch(`/api/quality-issues/groups/${groupId}`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ hideFromTv })
+			});
+
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({}));
+				failedMessage ??= data?.error ?? "Không cập nhật được hiển thị TV cho một số nhóm đã chọn.";
+				continue;
+			}
+
+			successCount += 1;
+		}
+
+		setBusy(null);
+		setSelectedLineIds([]);
+
+		if (failedMessage) {
+			setError(
+				successCount > 0
+					? `Đã cập nhật ${successCount}/${selectedGroupIds.length} nhóm. ${failedMessage}`
+					: failedMessage
+			);
+		}
+
+		await refreshPage();
+	}
+
+	async function bulkDeleteSelectedLines() {
+		if (selectedLineIds.length === 0) return;
+		const confirmed = window.confirm(`Xóa ${selectedLineIds.length} dòng đã chọn?`);
+		if (!confirmed) return;
+
+		setBusy("bulk-delete");
+		setError(null);
+
+		let successCount = 0;
+		let failedMessage: string | null = null;
+
+		for (const lineId of selectedLineIds) {
+			const res = await fetch(`/api/quality-issues/lines/${lineId}`, { method: "DELETE" });
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({}));
+				failedMessage ??= data?.error ?? "Không xóa được một số dòng đã chọn.";
+				continue;
+			}
+
+			successCount += 1;
+		}
+
+		setBusy(null);
+		setSelectedLineIds([]);
+
+		if (failedMessage) {
+			setError(
+				successCount > 0
+					? `Đã xóa ${successCount}/${selectedLineIds.length} dòng. ${failedMessage}`
+					: failedMessage
+			);
+		}
+
 		await refreshPage();
 	}
 
@@ -674,8 +793,58 @@ export function QualityIssueTrackerClient({
 					</div>
 				</div>
 
+				<div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
+					<div className="flex flex-wrap items-center gap-2 text-[12px] text-slate-600">
+						<span className="admin-badge">{selectedLineCount} dòng đang chọn</span>
+						<span className="admin-badge">{selectedGroupCount} nhóm bị ảnh hưởng</span>
+						<span>Tick theo từng dòng hoặc dùng nút chọn nhóm để thao tác hàng loạt.</span>
+					</div>
+					<div className="flex flex-wrap items-center gap-2">
+						<button
+							type="button"
+							disabled={bulkBusy || allLineIds.length === 0}
+							className={tinySecondaryButtonClass}
+							onClick={() => toggleAllLineSelection(true)}
+						>
+							Chọn tất cả
+						</button>
+						<button
+							type="button"
+							disabled={bulkBusy || selectedLineCount === 0}
+							className={tinySecondaryButtonClass}
+							onClick={() => toggleAllLineSelection(false)}
+						>
+							Bỏ chọn
+						</button>
+						<button
+							type="button"
+							disabled={bulkBusy || selectedGroupCount === 0}
+							className={tinyWarnButtonClass}
+							onClick={() => void bulkToggleTv(true)}
+						>
+							{busy === "bulk-hide" ? "Đang ẩn TV..." : "Ẩn TV nhóm chọn"}
+						</button>
+						<button
+							type="button"
+							disabled={bulkBusy || selectedGroupCount === 0}
+							className={tinySecondaryButtonClass}
+							onClick={() => void bulkToggleTv(false)}
+						>
+							{busy === "bulk-show" ? "Đang hiện TV..." : "Hiện TV nhóm chọn"}
+						</button>
+						<button
+							type="button"
+							disabled={bulkBusy || selectedLineCount === 0}
+							className={tinyDangerButtonClass}
+							onClick={() => void bulkDeleteSelectedLines()}
+						>
+							{busy === "bulk-delete" ? "Đang xóa..." : "Xóa dòng đã chọn"}
+						</button>
+					</div>
+				</div>
+
 				<div className="admin-table-shell">
-					<table className="min-w-[1624px] w-full table-fixed border-collapse text-[12px] leading-[1.35] text-slate-700 xl:text-[12.5px]">
+					<table className="min-w-[1666px] w-full table-fixed border-collapse text-[12px] leading-[1.35] text-slate-700 xl:text-[12.5px]">
 						<colgroup>
 							{tableColumnWidths.map((width, index) => (
 								<col key={index} style={{ width }} />
@@ -683,6 +852,15 @@ export function QualityIssueTrackerClient({
 						</colgroup>
 						<thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur">
 							<tr>
+								<th className={`${tableHeadCellClass} text-center`}>
+									<input
+										type="checkbox"
+										className="admin-checkbox"
+										checked={allVisibleSelected}
+										aria-label="Chọn tất cả dòng"
+										onChange={(e) => toggleAllLineSelection(e.target.checked)}
+									/>
+								</th>
 								<th className={`${tableHeadCellClass} text-center`}>STT</th>
 								<th className={tableHeadCellClass}>Tên sản phẩm hỏng/lỗi</th>
 								<th className={tableHeadCellClass}>Khách hàng</th>
@@ -700,7 +878,7 @@ export function QualityIssueTrackerClient({
 						<tbody>
 							{groups.length === 0 ? (
 								<tr>
-									<td colSpan={12} className="px-4 py-10 text-center text-[12px] text-slate-500">
+									<td colSpan={13} className="px-4 py-10 text-center text-[12px] text-slate-500">
 										Chưa có dữ liệu theo dõi lỗi chất lượng.
 									</td>
 								</tr>
@@ -708,11 +886,21 @@ export function QualityIssueTrackerClient({
 								groups.map((group, groupIndex) => {
 									const currentGroupDraft = groupDraft(group);
 									const rowToneClass = groupIndex % 2 === 0 ? "bg-white" : "bg-slate-50/50";
+									const groupAllSelected = group.lines.every((line) => selectedLineIdSet.has(line.id));
 
 									return group.lines.map((line, lineIndex) => {
 										const currentLineDraft = lineDraft(line);
 										return (
 											<tr key={line.id} className={`${rowToneClass} border-b border-slate-200/80`}>
+												<td className={`${tableLineCellClass} bg-slate-50/70 text-center align-middle`}>
+													<input
+														type="checkbox"
+														className="admin-checkbox"
+														checked={selectedLineIdSet.has(line.id)}
+														aria-label={`Chọn dòng ${line.lineOrder}`}
+														onChange={(e) => toggleLineSelection(line.id, e.target.checked)}
+													/>
+												</td>
 												{lineIndex === 0 ? (
 													<>
 														<td rowSpan={group.lines.length} className={`${tableGroupCellClass} text-center font-semibold text-slate-900`}>
@@ -728,7 +916,15 @@ export function QualityIssueTrackerClient({
 																<div className="flex flex-wrap gap-1.5">
 																	<button
 																		type="button"
-																		disabled={busy === `group-${group.groupId}`}
+																		disabled={bulkBusy}
+																		className={tinySecondaryButtonClass}
+																		onClick={() => toggleGroupSelection(group, !groupAllSelected)}
+																	>
+																		{groupAllSelected ? "Bỏ chọn nhóm" : "Chọn nhóm"}
+																	</button>
+																	<button
+																		type="button"
+																		disabled={bulkBusy || busy === `group-${group.groupId}`}
 																		className={tinySecondaryButtonClass}
 																		onClick={() => void saveGroup(group)}
 																	>
@@ -736,7 +932,7 @@ export function QualityIssueTrackerClient({
 																	</button>
 																	<button
 																		type="button"
-																		disabled={busy === `tv-${group.groupId}`}
+																		disabled={bulkBusy || busy === `tv-${group.groupId}`}
 																		className={tinyWarnButtonClass}
 																		onClick={() => void toggleTv(group)}
 																	>
@@ -829,7 +1025,7 @@ export function QualityIssueTrackerClient({
 														<div className="flex flex-wrap gap-1.5 pt-0.5">
 															<button
 																type="button"
-																disabled={busy === `line-${line.id}`}
+																disabled={bulkBusy || busy === `line-${line.id}`}
 																className={tinySecondaryButtonClass}
 																onClick={() => void saveLine(line)}
 															>
@@ -837,7 +1033,7 @@ export function QualityIssueTrackerClient({
 															</button>
 															<button
 																type="button"
-																disabled={busy === `del-${line.id}`}
+																disabled={bulkBusy || busy === `del-${line.id}`}
 																className={tinyDangerButtonClass}
 																onClick={() => void removeLine(line.id)}
 															>
